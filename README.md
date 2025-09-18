@@ -1,87 +1,43 @@
 # Canvas Table
 
-A high-performance React canvas-based table library with virtualization, built as a monorepo.
+The high-performance data grid toolkit for React.
 
-## Project Structure
+Created by Gruckion, this free open-source library provides a blazing-fast canvas-based table implementation for React applications with an intuitive API similar to TanStack Table.
 
-This is a pnpm workspace monorepo containing:
+## Installation
 
-```
-├── packages/
-│   └── canvas-table/        # Core library package
-│       ├── src/             # Source code
-│       │   ├── components/  # React components
-│       │   ├── hooks/       # React hooks
-│       │   ├── core/        # Core rendering logic
-│       │   └── types/       # TypeScript types
-│       └── dist/           # Built output
-│
-├── examples/
-│   └── nextjs/            # Next.js example application
-│
-└── docs/                  # Documentation
+```shell
+npm install @gruckion/canvas-table
 ```
 
-## Quick Start
+## Setup
 
-### Development
+Create a table instance with your configuration:
 
-1. Install dependencies:
-```bash
-pnpm install
+```typescript
+// app/table.tsx
+import { useCanvasTable } from '@gruckion/canvas-table';
+
+export function createTable() {
+  return useCanvasTable({
+    rowCount: 100000,
+    columnCount: 20,
+    defaultColumnWidth: 120,
+    defaultRowHeight: 30,
+  });
+}
 ```
-
-2. Build the library:
-```bash
-cd packages/canvas-table
-pnpm build
-```
-
-3. Run the example:
-```bash
-cd examples/nextjs
-pnpm dev
-```
-
-### Library Development
-
-The library uses tsup for building:
-
-```bash
-cd packages/canvas-table
-pnpm dev    # Watch mode
-pnpm build  # Production build
-```
-
-## Architecture
-
-The library follows a **headless, composable architecture** with clear separation of concerns:
-
-### Core Components
-
-- **`useCanvasTable`**: Main hook for table instance creation
-- **`useVirtualization`**: Handles viewport calculations and virtualization
-- **`CanvasRenderer`**: Encapsulates all canvas drawing operations
-
-### Component Composition
-
-Instead of a monolithic component, the library provides composable pieces:
-
-```tsx
-<CanvasTable table={table}>
-  <CanvasTableViewport />   // Canvas element
-  <CanvasTableScroller />   // Scroll container
-</CanvasTable>
-```
-
-### File Naming Convention
-
-All files use **kebab-case** naming:
-- `use-canvas-table.ts`
-- `canvas-renderer.ts`
-- `canvas-table-viewport.tsx`
 
 ## Features
+
+- 🚀 **Blazing Fast**: Render millions of cells with consistent 60fps performance
+- 🎨 **Canvas-based**: Uses HTML5 Canvas instead of DOM for superior performance
+- 🔄 **Virtualization**: Built-in row and column virtualization
+- 🧩 **Composable**: Small, focused components that work together
+- 📦 **Headless**: Core logic separated from rendering
+- 🎯 **TypeScript**: Full type safety and IntelliSense support
+
+### Roadmap
 
 - ✅ Virtualization for millions of rows/columns
 - ✅ Smooth 60fps scrolling
@@ -92,18 +48,54 @@ All files use **kebab-case** naming:
 - 🚧 Row/column selection (coming soon)
 - 🚧 Sticky headers (coming soon)
 - 🚧 Cell editing (coming soon)
+- 🚧 Styling with CSS / Tailwind
 
 ## Performance
 
 Optimized for massive datasets:
+
 - Handle 100M+ cells
 - < 100ms initial render
 - Consistent 60fps scrolling
 - Memory-efficient virtualization
 
-## Contributing
+## Usage
 
-Contributions are welcome! Please read the documentation in `/docs` to understand the architecture before contributing.
+Use in your React component:
+
+```typescript
+// app/page.tsx
+import {
+  CanvasTable,
+  CanvasTableViewport,
+  CanvasTableScroller,
+  useCanvasTable,
+} from '@gruckion/canvas-table';
+
+export default function DataGrid() {
+  const table = useCanvasTable({
+    rowCount: 100000,
+    columnCount: 20,
+    defaultColumnWidth: 120,
+    defaultRowHeight: 30,
+  });
+
+  return (
+    <CanvasTable table={table} height={600}>
+      <CanvasTableViewport />
+      <CanvasTableScroller />
+    </CanvasTable>
+  );
+}
+```
+
+## Examples
+
+See the [Next.js example](./examples/nextjs) for a complete implementation.
+
+## Documentation
+
+Visit [canvas-table.gruckion.com](https://canvas-table.gruckion.com) for full documentation.
 
 ## License
 

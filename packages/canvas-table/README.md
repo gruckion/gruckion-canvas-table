@@ -1,29 +1,26 @@
-# @gruckion/canvas-table
+# Canvas Table
 
-A high-performance, headless React canvas-based table library with virtualization support for rendering millions of rows and columns.
+The high-performance data grid toolkit for React.
 
-## Features
-
-- 🚀 **Blazing Fast**: Render millions of cells with consistent 60fps performance
-- 🎨 **Canvas-based**: Uses HTML5 Canvas instead of DOM for superior performance
-- 🔄 **Virtualization**: Built-in row and column virtualization
-- 🧩 **Composable**: Small, focused components that work together
-- 📦 **Headless**: Core logic separated from rendering
-- 🎯 **TypeScript**: Full type safety and IntelliSense support
+Built with canvas rendering and virtualization, this library handles millions of rows with smooth 60fps performance. Features an intuitive API similar to TanStack Table for a familiar developer experience.
 
 ## Installation
 
-```bash
+```shell
 npm install @gruckion/canvas-table
-# or
+```
+
+Or with pnpm:
+
+```shell
 pnpm add @gruckion/canvas-table
-# or
-yarn add @gruckion/canvas-table
 ```
 
 ## Quick Start
 
-```tsx
+Create a virtualized data grid with just a few lines:
+
+```typescript
 import {
   useCanvasTable,
   CanvasTable,
@@ -31,11 +28,11 @@ import {
   CanvasTableScroller,
 } from '@gruckion/canvas-table';
 
-function MyTable() {
+export default function DataGrid() {
   const table = useCanvasTable({
-    rowCount: 10000,
-    columnCount: 100,
-    defaultColumnWidth: 100,
+    rowCount: 100000,
+    columnCount: 20,
+    defaultColumnWidth: 120,
     defaultRowHeight: 30,
   });
 
@@ -48,29 +45,55 @@ function MyTable() {
 }
 ```
 
+## Features
+
+- 🚀 **Blazing Fast**: Render millions of cells with consistent 60fps performance
+- 🎨 **Canvas-based**: Uses HTML5 Canvas instead of DOM for superior performance
+- 🔄 **Virtualization**: Built-in row and column virtualization
+- 🧩 **Composable**: Small, focused components that work together
+- 📦 **Headless**: Core logic separated from rendering
+- 🎯 **TypeScript**: Full type safety and IntelliSense support
+
+### Roadmap
+
+- ✅ Virtualization for millions of rows/columns
+- ✅ Smooth 60fps scrolling
+- ✅ TypeScript support
+- ✅ Headless architecture
+- ✅ Composable components
+- 🚧 Column resizing (coming soon)
+- 🚧 Row/column selection (coming soon)
+- 🚧 Sticky headers (coming soon)
+- 🚧 Cell editing (coming soon)
+
+## Performance
+
+Optimized for massive datasets:
+
+- Handle 100M+ cells
+- < 100ms initial render
+- Consistent 60fps scrolling
+- Memory-efficient virtualization
+
 ## API Reference
 
 ### useCanvasTable
 
-The main hook for creating a table instance.
+The main hook for creating a table instance:
 
-```tsx
-const table = useCanvasTable(options);
+```typescript
+const table = useCanvasTable({
+  rowCount: 10000,
+  columnCount: 100,
+  defaultColumnWidth: 100,
+  defaultRowHeight: 30,
+  debugMode: false, // Enable debug overlay
+});
 ```
-
-#### Options
-
-- `rowCount` (number): Total number of rows
-- `columnCount` (number): Total number of columns
-- `defaultColumnWidth` (number): Default width for columns in pixels
-- `defaultRowHeight` (number): Default height for rows in pixels
-- `debugMode` (boolean): Enable debug overlay
 
 ### Components
 
-#### CanvasTable
-
-Main container component that provides table context.
+**CanvasTable** - Main container component
 
 ```tsx
 <CanvasTable table={table} height={600} width="100%">
@@ -78,39 +101,21 @@ Main container component that provides table context.
 </CanvasTable>
 ```
 
-#### CanvasTableViewport
-
-Renders the canvas element where the table is drawn.
+**CanvasTableViewport** - Renders the canvas element
 
 ```tsx
 <CanvasTableViewport className="custom-class" />
 ```
 
-#### CanvasTableScroller
-
-Provides scrolling functionality with virtualization.
+**CanvasTableScroller** - Provides virtual scrolling
 
 ```tsx
 <CanvasTableScroller className="custom-class" />
 ```
 
-## Architecture
+## Documentation
 
-The library follows a layered architecture:
-
-1. **Hooks Layer**: Core business logic (`useCanvasTable`, `useVirtualization`)
-2. **Components Layer**: React components for composition
-3. **Renderer Layer**: Canvas drawing operations
-4. **Types Layer**: TypeScript interfaces and types
-
-## Performance
-
-Canvas Table is designed to handle massive datasets:
-
-- 100M+ cells (10,000+ rows × 10,000+ columns)
-- Consistent 60 FPS scrolling
-- < 100ms initial render
-- < 200MB memory footprint for 1M visible cells
+Full documentation and examples available at [canvas-table.gruckion.com](https://canvas-table.gruckion.com).
 
 ## License
 
