@@ -1,6 +1,6 @@
 import { useRef, useCallback, useReducer, useEffect, useMemo } from 'react';
 import { CanvasRenderer } from '../core/canvas-renderer';
-import { useVirtualization } from './use-virtualization';
+import { useViewportRange } from './use-viewport-range';
 import type { TableOptions, TableState, TableInstance, ViewportInfo } from '../types';
 
 interface InternalState extends TableState {
@@ -72,12 +72,11 @@ export function useCanvasTable<TData = any>(
     height: state.viewportHeight,
   };
 
-  const visibleRange = useVirtualization(viewport, {
+  const visibleRange = useViewportRange(viewport, {
     totalRows: rowCount,
     totalColumns: columnCount,
     rowHeight: defaultRowHeight,
     columnWidth: defaultColumnWidth,
-    overscan: 3,
   });
 
   const getCellContent = useCallback(

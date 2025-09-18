@@ -80,6 +80,12 @@ export class CanvasRenderer {
   ) {
     const { cellWidth, cellHeight } = this.options;
 
+    // Artificial delay to simulate expensive rendering
+    const start = performance.now();
+    while (performance.now() - start < 100) {
+      // Busy wait for 100ms
+    }
+
     ctx.save();
     ctx.translate(visibleRange.offsetX, visibleRange.offsetY);
 

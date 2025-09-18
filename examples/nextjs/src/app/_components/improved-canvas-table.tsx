@@ -2,29 +2,40 @@
 
 import React, { useEffect, useRef, useCallback, useState } from 'react';
 
-interface CanvasTableProps {
-  rows?: number;
-  columns?: number;
-  cellWidth?: number;
-  cellHeight?: number;
+interface ColumnDef<TData = any> {
+  id: string;
+  header: string;
+  accessorKey?: string;
+  accessorFn?: (row: TData) => any;
+  cell?: (info: { value: any; row: TData }) => string;
+}
+
+interface ImprovedCanvasTableProps<TData = any> {
+  data: TData[];
+  columns: ColumnDef<TData>[];
+  defaultColumnWidth?: number;
+  defaultRowHeight?: number;
   className?: string;
 }
 
-export function CanvasTable({
-  rows = 10000,
-  columns = 100,
-  cellWidth = 100,
-  cellHeight = 30,
+export function ImprovedCanvasTable<TData extends Record<string, any> = any>({
+  data,
+  columns,
+  defaultColumnWidth = 100,
+  defaultRowHeight = 30,
   className = ''
-}: CanvasTableProps) {
+}: ImprovedCanvasTableProps<TData>) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const animationFrameRef = useRef<number>(0);
   const [isInitialized, setIsInitialized] = useState(false);
 
-  const totalWidth = columns * cellWidth;
-  const totalHeight = rows * cellHeight;
+  // Computed values
+  const totalRows = data.length + 1; // +1 for header row
+  const totalColumns = columns.length;
+  const totalWidth = totalColumns * defaultColumnWidth;
+  const totalHeight = totalRows * defaultRowHeight;
 
   const renderGrid = useCallback(() => {
     const canvas = canvasRef.current;
@@ -32,7 +43,6 @@ export function CanvasTable({
     const scrollContainer = scrollRef.current;
 
     if (!canvas || !container || !scrollContainer) return;
-
 
     // Artificial delay to simulate expensive rendering
     const start = performance.now();
@@ -49,20 +59,20 @@ export function CanvasTable({
     const viewportWidth = container.clientWidth;
     const viewportHeight = container.clientHeight;
 
-    const firstVisibleRow = Math.floor(scrollY / cellHeight);
+    const firstVisibleRow = Math.floor(scrollY / defaultRowHeight);
     const lastVisibleRow = Math.min(
-      Math.ceil((scrollY + viewportHeight) / cellHeight),
-      rows
+      Math.ceil((scrollY + viewportHeight) / defaultRowHeight),
+      totalRows
     );
 
-    const firstVisibleCol = Math.floor(scrollX / cellWidth);
+    const firstVisibleCol = Math.floor(scrollX / defaultColumnWidth);
     const lastVisibleCol = Math.min(
-      Math.ceil((scrollX + viewportWidth) / cellWidth),
-      columns
+      Math.ceil((scrollX + viewportWidth) / defaultColumnWidth),
+      totalColumns
     );
 
-    const offsetY = -(scrollY % cellHeight);
-    const offsetX = -(scrollX % cellWidth);
+    const offsetY = -(scrollY % defaultRowHeight);
+    const offsetX = -(scrollX % defaultColumnWidth);
 
     const dpr = window.devicePixelRatio || 1;
     canvas.width = viewportWidth * dpr;
@@ -83,42 +93,69 @@ export function CanvasTable({
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
 
+    // Main rendering loop with inline data access
     for (let row = firstVisibleRow; row <= lastVisibleRow; row++) {
       for (let col = firstVisibleCol; col <= lastVisibleCol; col++) {
-        const x = (col - firstVisibleCol) * cellWidth;
-        const y = (row - firstVisibleRow) * cellHeight;
+        const x = (col - firstVisibleCol) * defaultColumnWidth;
+        const y = (row - firstVisibleRow) * defaultRowHeight;
 
-        ctx.strokeRect(x, y, cellWidth, cellHeight);
+        ctx.strokeRect(x, y, defaultColumnWidth, defaultRowHeight);
 
+        // Row 0 = headers
         if (row === 0) {
           ctx.fillStyle = '#f3f4f6';
-          ctx.fillRect(x, y, cellWidth, cellHeight);
+          ctx.fillRect(x, y, defaultColumnWidth, defaultRowHeight);
           ctx.fillStyle = '#1f2937';
-          ctx.fillText(`Col ${col + 1}`, x + cellWidth / 2, y + cellHeight / 2);
+          const header = columns[col]?.header || `Col ${col + 1}`;
+          ctx.fillText(header, x + defaultColumnWidth / 2, y + defaultRowHeight / 2);
         } else if (col === 0) {
+          // First column - grey background with row numbers
           ctx.fillStyle = '#f3f4f6';
-          ctx.fillRect(x, y, cellWidth, cellHeight);
+          ctx.fillRect(x, y, defaultColumnWidth, defaultRowHeight);
           ctx.fillStyle = '#1f2937';
-          ctx.fillText(`Row ${row}`, x + cellWidth / 2, y + cellHeight / 2);
+          ctx.fillText(`Row ${row}`, x + defaultColumnWidth / 2, y + defaultRowHeight / 2);
         } else {
-          ctx.fillStyle = '#374151';
-          ctx.fillText(`${row},${col}`, x + cellWidth / 2, y + cellHeight / 2);
+          // Data cells - direct array access
+          const dataRowIndex = row - 1; // -1 because row 0 is header
+          const dataRow = data[dataRowIndex];
+
+          if (dataRow && columns[col]) {
+            const column = columns[col];
+            let value = '';
+
+            // Inline accessor logic - no function call overhead
+            if (column.accessorKey) {
+              value = String(dataRow[column.accessorKey] ?? '');
+            } else if (column.accessorFn) {
+              // Only call function if absolutely necessary
+              value = String(column.accessorFn(dataRow) ?? '');
+            }
+
+            // Optional cell formatter
+            if (column.cell && value !== '') {
+              value = column.cell({ value, row: dataRow });
+            }
+
+            ctx.fillStyle = '#374151';
+            ctx.fillText(value, x + defaultColumnWidth / 2, y + defaultRowHeight / 2);
+          }
         }
       }
     }
 
     ctx.restore();
 
+    // Debug info
     const visibleRows = lastVisibleRow - firstVisibleRow;
     const visibleCols = lastVisibleCol - firstVisibleCol;
     ctx.fillStyle = '#10b981';
     ctx.font = '10px monospace';
     ctx.fillText(
-      `Rendering: ${visibleRows}×${visibleCols} cells | Viewport: Row ${firstVisibleRow}-${lastVisibleRow}, Col ${firstVisibleCol}-${lastVisibleCol}`,
+      `Improved: ${visibleRows}×${visibleCols} cells | Viewport: Row ${firstVisibleRow}-${lastVisibleRow}, Col ${firstVisibleCol}-${lastVisibleCol} | Data: ${data.length}×${columns.length}`,
       10,
       viewportHeight - 10
     );
-  }, [rows, columns, cellWidth, cellHeight]);
+  }, [data, columns, defaultColumnWidth, defaultRowHeight, totalRows, totalColumns]);
 
   const handleScroll = useCallback(() => {
     if (animationFrameRef.current) {
@@ -153,7 +190,6 @@ export function CanvasTable({
       className={`relative overflow-hidden ${className}`}
       style={{ width: '100%', height: '600px' }}
     >
-
       <canvas
         ref={canvasRef}
         className="absolute top-0 left-0 pointer-events-none"
