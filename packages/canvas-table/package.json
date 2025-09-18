@@ -1,0 +1,56 @@
+{
+  "name": "@gruckion/canvas-table",
+  "version": "0.0.1",
+  "description": "High-performance React canvas-based table with virtualization",
+  "author": "Gruckion",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/gruckion/canvas-table"
+  },
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "dev": "tsup --watch",
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src",
+    "clean": "rm -rf dist"
+  },
+  "peerDependencies": {
+    "react": "^18.0.0 || ^19.0.0",
+    "react-dom": "^18.0.0 || ^19.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.1.0",
+    "@types/react-dom": "^19.0.2",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "tsup": "^8.3.5",
+    "typescript": "^5.7.3"
+  },
+  "keywords": [
+    "react",
+    "table",
+    "canvas",
+    "virtualization",
+    "data-grid",
+    "performance",
+    "tanstack-table"
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
+}
