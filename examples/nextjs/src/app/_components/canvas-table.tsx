@@ -271,28 +271,45 @@ export default function CanvasDataGrid() {
       if (firstRowIndex <= lastRowIndex) {
         getRows(firstRowIndex, lastRowIndex + 1).then((page) => {
           raf(() => {
+            // Get fresh container dimensions and scroll position
+            const container = containerRef.current;
+            if (!container) return;
+
+            const rect = container.getBoundingClientRect();
+            const currentScrollLeft = container.scrollLeft;
+            const currentScrollTop = container.scrollTop;
+            const currentWidth = rect.width;
+            const currentHeight = rect.height;
+
+            // Recalculate visible columns with current scroll position
+            const currentViewLeft = currentScrollLeft;
+            const currentViewRight = currentScrollLeft + currentWidth;
+            const currentVisibleCols = measureVisibleColumns(columnOffsets, columns, currentViewLeft, currentViewRight);
+
+            // Clear the row area first
             ctx.save();
             ctx.scale(deviceScale, deviceScale);
+            ctx.clearRect(0, headerHeight, currentWidth, currentHeight - headerHeight);
             ctx.textBaseline = "middle";
             ctx.font = fontFamily;
 
             for (let r = firstRowIndex; r <= lastRowIndex; r++) {
-              const y = headerHeight + r * rowHeight - viewTop;
+              const y = headerHeight + r * rowHeight - currentScrollTop;
               const isEven = r % 2 === 0;
               ctx.fillStyle = isEven ? "#ffffff" : "#fbfbfc";
-              ctx.fillRect(0 - (viewLeft), y, totalWidth, rowHeight);
+              ctx.fillRect(0, y, currentWidth, rowHeight);
 
               ctx.beginPath();
-              ctx.moveTo(0 - viewLeft, y + rowHeight - 0.5);
-              ctx.lineTo(totalWidth - viewLeft, y + rowHeight - 0.5);
+              ctx.moveTo(0, y + rowHeight - 0.5);
+              ctx.lineTo(currentWidth, y + rowHeight - 0.5);
               ctx.strokeStyle = "#eee";
               ctx.stroke();
 
               const row = page[r - firstRowIndex];
               ctx.fillStyle = "#222";
-              for (let c = visibleCols.first; c < visibleCols.last; c++) {
+              for (let c = currentVisibleCols.first; c < currentVisibleCols.last; c++) {
                 const col = columns[c];
-                const x = columnOffsets[c] - viewLeft;
+                const x = columnOffsets[c] - currentScrollLeft;
                 const text = row[c]?.text ?? "";
                 ctx.save();
                 ctx.beginPath();
@@ -303,11 +320,11 @@ export default function CanvasDataGrid() {
               }
             }
 
-            for (let c = visibleCols.first; c < visibleCols.last; c++) {
-              const x = columnOffsets[c] + columns[c].width - 0.5 - viewLeft;
+            for (let c = currentVisibleCols.first; c < currentVisibleCols.last; c++) {
+              const x = columnOffsets[c] + columns[c].width - 0.5 - currentScrollLeft;
               ctx.beginPath();
               ctx.moveTo(x, headerHeight);
-              ctx.lineTo(x, size.height + viewTop);
+              ctx.lineTo(x, currentHeight);
               ctx.strokeStyle = "#f0f0f0";
               ctx.stroke();
             }
@@ -319,7 +336,7 @@ export default function CanvasDataGrid() {
 
       ctx.restore();
     },
-    [columns, columnOffsets, rowCount, rowHeight, headerHeight, totalWidth, deviceScale, fontFamily, getRows, scrollLeft, scrollTop, raf]
+    [columns, columnOffsets, rowCount, rowHeight, headerHeight, totalWidth, deviceScale, fontFamily, getRows, scrollLeft, scrollTop, raf, containerRef, measureVisibleColumns]
   );
 
   useCanvasResize(canvasRef, containerRef, deviceScale, draw);
