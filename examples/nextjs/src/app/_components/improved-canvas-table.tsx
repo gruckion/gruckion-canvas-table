@@ -18,6 +18,141 @@ interface ImprovedCanvasTableProps<TData = any> {
   className?: string;
 }
 
+interface ViewportBounds {
+  firstRow: number;
+  lastRow: number;
+  firstCol: number;
+  lastCol: number;
+  offsetX: number;
+  offsetY: number;
+}
+
+// Pure function to setup canvas with device pixel ratio
+function setupCanvas(
+  canvas: HTMLCanvasElement,
+  width: number,
+  height: number
+): CanvasRenderingContext2D | null {
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = width * dpr;
+  canvas.height = height * dpr;
+  canvas.style.width = `${width}px`;
+  canvas.style.height = `${height}px`;
+
+  const ctx = canvas.getContext('2d');
+  if (ctx) {
+    ctx.scale(dpr, dpr);
+  }
+  return ctx;
+}
+
+// Pure function to calculate viewport bounds
+function calculateViewport(
+  scrollX: number,
+  scrollY: number,
+  viewportWidth: number,
+  viewportHeight: number,
+  totalRows: number,
+  totalColumns: number,
+  cellWidth: number,
+  cellHeight: number
+): ViewportBounds {
+  return {
+    firstRow: Math.floor(scrollY / cellHeight),
+    lastRow: Math.min(
+      Math.ceil((scrollY + viewportHeight) / cellHeight),
+      totalRows
+    ),
+    firstCol: Math.floor(scrollX / cellWidth),
+    lastCol: Math.min(
+      Math.ceil((scrollX + viewportWidth) / cellWidth),
+      totalColumns
+    ),
+    offsetX: -(scrollX % cellWidth),
+    offsetY: -(scrollY % cellHeight)
+  };
+}
+
+// Inline function for cell rendering - kept simple for performance
+function renderCell(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  content: string,
+  isHeader: boolean
+) {
+  ctx.strokeRect(x, y, width, height);
+
+  if (isHeader) {
+    ctx.fillStyle = '#f3f4f6';
+    ctx.fillRect(x, y, width, height);
+    ctx.fillStyle = '#1f2937';
+  } else {
+    ctx.fillStyle = '#374151';
+  }
+
+  ctx.fillText(content, x + width / 2, y + height / 2);
+}
+
+// Function to resolve cell content
+function getCellContent<TData extends Record<string, any>>(
+  row: number,
+  col: number,
+  data: TData[],
+  columns: ColumnDef<TData>[]
+): string {
+  // Header row
+  if (row === 0) {
+    return columns[col]?.header || `Col ${col + 1}`;
+  }
+
+  // Row headers (first column)
+  if (col === 0) {
+    return `Row ${row}`;
+  }
+
+  // Data cells
+  const dataRowIndex = row - 1; // -1 because row 0 is header
+  const dataRow = data[dataRowIndex];
+  const column = columns[col];
+
+  if (!dataRow || !column) return '';
+
+  // Extract raw value
+  const rawValue = column.accessorKey
+    ? String(dataRow[column.accessorKey] ?? '')
+    : column.accessorFn
+      ? String(column.accessorFn(dataRow) ?? '')
+      : '';
+
+  // Apply optional cell formatter
+  return column.cell && rawValue !== ''
+    ? column.cell({ value: rawValue, row: dataRow })
+    : rawValue;
+}
+
+// Function to render debug info
+function renderDebugInfo(
+  ctx: CanvasRenderingContext2D,
+  bounds: ViewportBounds,
+  viewportHeight: number,
+  dataRows: number,
+  columnCount: number
+) {
+  const visibleRows = bounds.lastRow - bounds.firstRow;
+  const visibleCols = bounds.lastCol - bounds.firstCol;
+
+  ctx.fillStyle = '#10b981';
+  ctx.font = '10px monospace';
+  ctx.fillText(
+    `Improved: ${visibleRows}×${visibleCols} cells | Viewport: Row ${bounds.firstRow}-${bounds.lastRow}, Col ${bounds.firstCol}-${bounds.lastCol} | Data: ${dataRows}×${columnCount}`,
+    10,
+    viewportHeight - 10
+  );
+}
+
 export function ImprovedCanvasTable<TData extends Record<string, any> = any>({
   data,
   columns,
@@ -50,111 +185,59 @@ export function ImprovedCanvasTable<TData extends Record<string, any> = any>({
       // Busy wait for 100ms
     }
 
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
     const scrollX = scrollContainer.scrollLeft;
     const scrollY = scrollContainer.scrollTop;
-
     const viewportWidth = container.clientWidth;
     const viewportHeight = container.clientHeight;
 
-    const firstVisibleRow = Math.floor(scrollY / defaultRowHeight);
-    const lastVisibleRow = Math.min(
-      Math.ceil((scrollY + viewportHeight) / defaultRowHeight),
-      totalRows
+    // Calculate viewport bounds
+    const bounds = calculateViewport(
+      scrollX,
+      scrollY,
+      viewportWidth,
+      viewportHeight,
+      totalRows,
+      totalColumns,
+      defaultColumnWidth,
+      defaultRowHeight
     );
 
-    const firstVisibleCol = Math.floor(scrollX / defaultColumnWidth);
-    const lastVisibleCol = Math.min(
-      Math.ceil((scrollX + viewportWidth) / defaultColumnWidth),
-      totalColumns
-    );
+    // Setup canvas with DPR
+    const ctx = setupCanvas(canvas, viewportWidth, viewportHeight);
+    if (!ctx) return;
 
-    const offsetY = -(scrollY % defaultRowHeight);
-    const offsetX = -(scrollX % defaultColumnWidth);
-
-    const dpr = window.devicePixelRatio || 1;
-    canvas.width = viewportWidth * dpr;
-    canvas.height = viewportHeight * dpr;
-    canvas.style.width = `${viewportWidth}px`;
-    canvas.style.height = `${viewportHeight}px`;
-
-    ctx.scale(dpr, dpr);
-
+    // Clear canvas
     ctx.clearRect(0, 0, viewportWidth, viewportHeight);
 
+    // Setup rendering context
     ctx.save();
-    ctx.translate(offsetX, offsetY);
+    ctx.translate(bounds.offsetX, bounds.offsetY);
 
+    // Set default styles once
     ctx.strokeStyle = '#e5e7eb';
-    ctx.fillStyle = '#1f2937';
     ctx.font = '12px monospace';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
 
-    // Main rendering loop with inline data access
-    for (let row = firstVisibleRow; row <= lastVisibleRow; row++) {
-      for (let col = firstVisibleCol; col <= lastVisibleCol; col++) {
-        const x = (col - firstVisibleCol) * defaultColumnWidth;
-        const y = (row - firstVisibleRow) * defaultRowHeight;
+    // Main rendering loop - still inline for performance
+    for (let row = bounds.firstRow; row <= bounds.lastRow; row++) {
+      for (let col = bounds.firstCol; col <= bounds.lastCol; col++) {
+        const x = (col - bounds.firstCol) * defaultColumnWidth;
+        const y = (row - bounds.firstRow) * defaultRowHeight;
 
-        ctx.strokeRect(x, y, defaultColumnWidth, defaultRowHeight);
+        // Get content and determine if it's a header
+        const content = getCellContent(row, col, data, columns);
+        const isHeader = row === 0 || col === 0;
 
-        // Row 0 = headers
-        if (row === 0) {
-          ctx.fillStyle = '#f3f4f6';
-          ctx.fillRect(x, y, defaultColumnWidth, defaultRowHeight);
-          ctx.fillStyle = '#1f2937';
-          const header = columns[col]?.header || `Col ${col + 1}`;
-          ctx.fillText(header, x + defaultColumnWidth / 2, y + defaultRowHeight / 2);
-        } else if (col === 0) {
-          // First column - grey background with row numbers
-          ctx.fillStyle = '#f3f4f6';
-          ctx.fillRect(x, y, defaultColumnWidth, defaultRowHeight);
-          ctx.fillStyle = '#1f2937';
-          ctx.fillText(`Row ${row}`, x + defaultColumnWidth / 2, y + defaultRowHeight / 2);
-        } else {
-          // Data cells - direct array access
-          const dataRowIndex = row - 1; // -1 because row 0 is header
-          const dataRow = data[dataRowIndex];
-
-          if (dataRow && columns[col]) {
-            const column = columns[col];
-            let value = '';
-
-            // Inline accessor logic - no function call overhead
-            if (column.accessorKey) {
-              value = String(dataRow[column.accessorKey] ?? '');
-            } else if (column.accessorFn) {
-              // Only call function if absolutely necessary
-              value = String(column.accessorFn(dataRow) ?? '');
-            }
-
-            // Optional cell formatter
-            if (column.cell && value !== '') {
-              value = column.cell({ value, row: dataRow });
-            }
-
-            ctx.fillStyle = '#374151';
-            ctx.fillText(value, x + defaultColumnWidth / 2, y + defaultRowHeight / 2);
-          }
-        }
+        // Render the cell
+        renderCell(ctx, x, y, defaultColumnWidth, defaultRowHeight, content, isHeader);
       }
     }
 
     ctx.restore();
 
-    // Debug info
-    const visibleRows = lastVisibleRow - firstVisibleRow;
-    const visibleCols = lastVisibleCol - firstVisibleCol;
-    ctx.fillStyle = '#10b981';
-    ctx.font = '10px monospace';
-    ctx.fillText(
-      `Improved: ${visibleRows}×${visibleCols} cells | Viewport: Row ${firstVisibleRow}-${lastVisibleRow}, Col ${firstVisibleCol}-${lastVisibleCol} | Data: ${data.length}×${columns.length}`,
-      10,
-      viewportHeight - 10
-    );
+    // Render debug info
+    renderDebugInfo(ctx, bounds, viewportHeight, data.length, columns.length);
   }, [data, columns, defaultColumnWidth, defaultRowHeight, totalRows, totalColumns]);
 
   const handleScroll = useCallback(() => {
