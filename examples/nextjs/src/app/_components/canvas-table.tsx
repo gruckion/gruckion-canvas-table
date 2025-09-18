@@ -1,376 +1,174 @@
-"use client";
-import React, { useCallback, useEffect, useMemo, useRef, useState, RefObject } from "react";
+'use client';
 
-/**
- * 
- * @param seed 
- * @returns 
- */
-function createRng(seed: number) {
-  let s = seed >>> 0;
-  return () => {
-    s = (s * 1664525 + 1013904223) >>> 0;
-    return s / 0xffffffff;
-  };
+import React, { useEffect, useRef, useCallback, useState } from 'react';
+
+interface CanvasTableProps {
+  rows?: number;
+  columns?: number;
+  cellWidth?: number;
+  cellHeight?: number;
+  className?: string;
 }
 
-type GridSize = { width: number; height: number };
-type Column = { id: string; title: string; width: number };
-type Cell = { text: string };
+export function CanvasTable({
+  rows = 10000,
+  columns = 100,
+  cellWidth = 100,
+  cellHeight = 30,
+  className = ''
+}: CanvasTableProps) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const animationFrameRef = useRef<number>(0);
+  const [isInitialized, setIsInitialized] = useState(false);
 
-type RowProvider = (start: number, endExclusive: number) => Promise<Cell[][]>;
+  const totalWidth = columns * cellWidth;
+  const totalHeight = rows * cellHeight;
 
-/**
- * 
- * @param columns 
- * @param wordList 
- * @returns 
- */
-function createDemoProvider(columns: Column[], wordList: string[]): RowProvider {
-  const pageCache = new Map<string, Cell[][]>();
-
-  return async (start: number, endExclusive: number) => {
-    const key = `${start}-${endExclusive}`;
-    const cached = pageCache.get(key);
-    if (cached) return cached;
-
-    const count = endExclusive - start;
-    const rows: Cell[][] = new Array(count);
-    for (let r = 0; r < count; r++) {
-      const rowIndex = start + r;
-      const rng = createRng(rowIndex + 13);
-      const row: Cell[] = new Array(columns.length);
-      for (let c = 0; c < columns.length; c++) {
-        const w1 = wordList[Math.floor(rng() * wordList.length)];
-        const w2 = wordList[Math.floor(rng() * wordList.length)];
-        row[c] = { text: `R${rowIndex + 1} ${columns[c].title} ${w1} ${w2}` };
-      }
-      rows[r] = row;
-    }
-
-    pageCache.set(key, rows);
-    return rows;
-  };
-}
-
-/**
- * 
- * @returns 
- */
-function useDevicePixelRatio() {
-  const [scale, setScale] = useState(() => (typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1));
-  useEffect(() => {
-    const handler = () => setScale(window.devicePixelRatio || 1);
-    window.addEventListener("resize", handler);
-    return () => window.removeEventListener("resize", handler);
-  }, []);
-  return scale;
-}
-
-/**
- * 
- * @param columns 
- * @returns 
- */
-function useColumnOffsets(columns: Column[]) {
-  return useMemo(() => {
-    const offsets: number[] = [];
-    let acc = 0;
-    for (const col of columns) {
-      offsets.push(acc);
-      acc += col.width;
-    }
-    return { offsets, totalWidth: acc };
-  }, [columns]);
-}
-
-/**
- * 
- * @param canvasRef 
- * @param containerRef 
- * @param deviceScale 
- * @param draw 
- */
-function useCanvasResize(
-  canvasRef: RefObject<HTMLCanvasElement | null>,
-  containerRef: RefObject<HTMLDivElement | null>,
-  deviceScale: number,
-  draw: (ctx: CanvasRenderingContext2D, size: GridSize) => void
-) {
-  useEffect(() => {
+  const renderGrid = useCallback(() => {
     const canvas = canvasRef.current;
     const container = containerRef.current;
-    if (!canvas || !container) return;
+    const scrollContainer = scrollRef.current;
 
-    const applySize = () => {
-      const rect = container.getBoundingClientRect();
-      canvas.width = Math.max(1, Math.floor(rect.width * deviceScale));
-      canvas.height = Math.max(1, Math.floor(rect.height * deviceScale));
-      canvas.style.width = `${rect.width}px`;
-      canvas.style.height = `${rect.height}px`;
-      const ctx = canvas.getContext("2d");
-      if (ctx) draw(ctx, { width: rect.width, height: rect.height });
+    if (!canvas || !container || !scrollContainer) return;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const scrollX = scrollContainer.scrollLeft;
+    const scrollY = scrollContainer.scrollTop;
+
+    const viewportWidth = container.clientWidth;
+    const viewportHeight = container.clientHeight;
+
+    const firstVisibleRow = Math.floor(scrollY / cellHeight);
+    const lastVisibleRow = Math.min(
+      Math.ceil((scrollY + viewportHeight) / cellHeight),
+      rows
+    );
+
+    const firstVisibleCol = Math.floor(scrollX / cellWidth);
+    const lastVisibleCol = Math.min(
+      Math.ceil((scrollX + viewportWidth) / cellWidth),
+      columns
+    );
+
+    const offsetY = -(scrollY % cellHeight);
+    const offsetX = -(scrollX % cellWidth);
+
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = viewportWidth * dpr;
+    canvas.height = viewportHeight * dpr;
+    canvas.style.width = `${viewportWidth}px`;
+    canvas.style.height = `${viewportHeight}px`;
+
+    ctx.scale(dpr, dpr);
+
+    ctx.clearRect(0, 0, viewportWidth, viewportHeight);
+
+    ctx.save();
+    ctx.translate(offsetX, offsetY);
+
+    ctx.strokeStyle = '#e5e7eb';
+    ctx.fillStyle = '#1f2937';
+    ctx.font = '12px monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+    for (let row = firstVisibleRow; row <= lastVisibleRow; row++) {
+      for (let col = firstVisibleCol; col <= lastVisibleCol; col++) {
+        const x = (col - firstVisibleCol) * cellWidth;
+        const y = (row - firstVisibleRow) * cellHeight;
+
+        ctx.strokeRect(x, y, cellWidth, cellHeight);
+
+        if (row === 0) {
+          ctx.fillStyle = '#f3f4f6';
+          ctx.fillRect(x, y, cellWidth, cellHeight);
+          ctx.fillStyle = '#1f2937';
+          ctx.fillText(`Col ${col + 1}`, x + cellWidth / 2, y + cellHeight / 2);
+        } else if (col === 0) {
+          ctx.fillStyle = '#f3f4f6';
+          ctx.fillRect(x, y, cellWidth, cellHeight);
+          ctx.fillStyle = '#1f2937';
+          ctx.fillText(`Row ${row}`, x + cellWidth / 2, y + cellHeight / 2);
+        } else {
+          ctx.fillStyle = '#374151';
+          ctx.fillText(`${row},${col}`, x + cellWidth / 2, y + cellHeight / 2);
+        }
+      }
+    }
+
+    ctx.restore();
+
+    const visibleRows = lastVisibleRow - firstVisibleRow;
+    const visibleCols = lastVisibleCol - firstVisibleCol;
+    ctx.fillStyle = '#10b981';
+    ctx.font = '10px monospace';
+    ctx.fillText(
+      `Rendering: ${visibleRows}×${visibleCols} cells | Viewport: Row ${firstVisibleRow}-${lastVisibleRow}, Col ${firstVisibleCol}-${lastVisibleCol}`,
+      10,
+      viewportHeight - 10
+    );
+  }, [rows, columns, cellWidth, cellHeight]);
+
+  const handleScroll = useCallback(() => {
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current);
+    }
+
+    animationFrameRef.current = requestAnimationFrame(() => {
+      renderGrid();
+    });
+  }, [renderGrid]);
+
+  useEffect(() => {
+    const handleResize = () => {
+      renderGrid();
     };
 
-    const ro = new ResizeObserver(applySize);
-    ro.observe(container);
-    applySize();
-    return () => ro.disconnect();
-  }, [canvasRef, containerRef, deviceScale, draw]);
-}
+    window.addEventListener('resize', handleResize);
+    renderGrid();
+    setIsInitialized(true);
 
-/**
- * 
- * @returns 
- */
-function useRaf() {
-  const rafId = useRef<number | null>(null);
-  const frame = (fn: () => void) => {
-    if (rafId.current != null) cancelAnimationFrame(rafId.current);
-    rafId.current = requestAnimationFrame(() => {
-      rafId.current = null;
-      fn();
-    });
-  };
-  useEffect(() => () => {
-    if (rafId.current != null) cancelAnimationFrame(rafId.current);
-  }, []);
-  return frame;
-}
-
-/**
- * 
- * @param columnOffsets 
- * @param columns 
- * @param viewLeft 
- * @param viewRight 
- * @returns 
- */
-function measureVisibleColumns(columnOffsets: number[], columns: Column[], viewLeft: number, viewRight: number) {
-  let first = 0;
-  while (first < columns.length && columnOffsets[first] + columns[first].width < viewLeft) first++;
-  let last = first;
-  while (last < columns.length && columnOffsets[last] < viewRight) last++;
-  return { first, last };
-}
-
-/**
- * 
- * @param value 
- * @param min 
- * @param max 
- * @returns 
- */
-function clamp(value: number, min: number, max: number) {
-  return Math.max(min, Math.min(max, value));
-}
-
-/**
- * 
- * @returns 
- */
-export default function CanvasDataGrid() {
-  const rowCount = 100_000;
-  const columnCount = 20;
-  const rowHeight = 28;
-  const headerHeight = 34;
-  const fontFamily = "12px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial";
-
-  const columns = useMemo<Column[]>(() => {
-    const cols: Column[] = [];
-    for (let i = 0; i < columnCount; i++) {
-      const width = 110 + ((i * 37) % 90); // varied but readable
-      cols.push({ id: `c${i}`, title: `Col ${i + 1}`, width });
-    }
-    return cols;
-  }, []);
-
-  const { offsets: columnOffsets, totalWidth } = useColumnOffsets(columns);
-  const totalHeight = headerHeight + rowCount * rowHeight;
-
-  const words = useMemo(
-    () =>
-      [
-        "alpha",
-        "bravo",
-        "charlie",
-        "delta",
-        "echo",
-        "foxtrot",
-        "golf",
-        "hotel",
-        "india",
-        "juliet",
-        "kilo",
-        "lima",
-        "mike",
-        "november",
-        "oscar",
-        "papa",
-        "quebec",
-        "romeo",
-        "sierra",
-        "tango",
-        "uniform",
-        "victor",
-        "whiskey",
-        "xray",
-        "yankee",
-        "zulu",
-      ],
-    []
-  );
-
-  const getRows = useMemo(() => createDemoProvider(columns, words), [columns, words]);
-
-  const containerRef = useRef<HTMLDivElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-
-  const [scrollLeft, setScrollLeft] = useState(0);
-  const [scrollTop, setScrollTop] = useState(0);
-
-  const deviceScale = useDevicePixelRatio();
-  const raf = useRaf();
-
-  const draw = useCallback(
-    (ctx: CanvasRenderingContext2D, size: GridSize) => {
-      const viewLeft = scrollLeft;
-      const viewTop = scrollTop;
-      const viewRight = viewLeft + size.width;
-      const viewBottom = viewTop + size.height;
-
-      ctx.save();
-      ctx.scale(deviceScale, deviceScale);
-      ctx.clearRect(0, 0, size.width, size.height);
-      ctx.textBaseline = "middle";
-      ctx.font = fontFamily;
-
-      // Header background
-      ctx.fillStyle = "#f6f7f9";
-      ctx.fillRect(0, 0, size.width, headerHeight - (viewTop > 0 ? 0 : 0));
-
-      const visibleCols = measureVisibleColumns(columnOffsets, columns, viewLeft, viewRight);
-
-      // Header
-      ctx.fillStyle = "#111";
-      for (let c = visibleCols.first; c < visibleCols.last; c++) {
-        const x = columnOffsets[c] - viewLeft;
-        const col = columns[c];
-        ctx.fillText(col.title, x + 8, headerHeight / 2);
-        ctx.beginPath();
-        ctx.moveTo(x + col.width - 0.5, 0);
-        ctx.lineTo(x + col.width - 0.5, headerHeight);
-        ctx.strokeStyle = "#ddd";
-        ctx.stroke();
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
       }
-
-      // Rows
-      const firstRowIndex = clamp(Math.floor((viewTop - headerHeight) / rowHeight), 0, rowCount - 1);
-      const lastRowIndex = clamp(Math.floor((viewBottom - headerHeight) / rowHeight), 0, rowCount - 1);
-
-      if (firstRowIndex <= lastRowIndex) {
-        getRows(firstRowIndex, lastRowIndex + 1).then((page) => {
-          raf(() => {
-            // Get fresh container dimensions and scroll position
-            const container = containerRef.current;
-            if (!container) return;
-
-            const rect = container.getBoundingClientRect();
-            const currentScrollLeft = container.scrollLeft;
-            const currentScrollTop = container.scrollTop;
-            const currentWidth = rect.width;
-            const currentHeight = rect.height;
-
-            // Recalculate visible columns with current scroll position
-            const currentViewLeft = currentScrollLeft;
-            const currentViewRight = currentScrollLeft + currentWidth;
-            const currentVisibleCols = measureVisibleColumns(columnOffsets, columns, currentViewLeft, currentViewRight);
-
-            // Clear the row area first
-            ctx.save();
-            ctx.scale(deviceScale, deviceScale);
-            ctx.clearRect(0, headerHeight, currentWidth, currentHeight - headerHeight);
-            ctx.textBaseline = "middle";
-            ctx.font = fontFamily;
-
-            for (let r = firstRowIndex; r <= lastRowIndex; r++) {
-              const y = headerHeight + r * rowHeight - currentScrollTop;
-              const isEven = r % 2 === 0;
-              ctx.fillStyle = isEven ? "#ffffff" : "#fbfbfc";
-              ctx.fillRect(0, y, currentWidth, rowHeight);
-
-              ctx.beginPath();
-              ctx.moveTo(0, y + rowHeight - 0.5);
-              ctx.lineTo(currentWidth, y + rowHeight - 0.5);
-              ctx.strokeStyle = "#eee";
-              ctx.stroke();
-
-              const row = page[r - firstRowIndex];
-              ctx.fillStyle = "#222";
-              for (let c = currentVisibleCols.first; c < currentVisibleCols.last; c++) {
-                const col = columns[c];
-                const x = columnOffsets[c] - currentScrollLeft;
-                const text = row[c]?.text ?? "";
-                ctx.save();
-                ctx.beginPath();
-                ctx.rect(x + 4, y, col.width - 8, rowHeight);
-                ctx.clip();
-                ctx.fillText(text, x + 8, y + rowHeight / 2);
-                ctx.restore();
-              }
-            }
-
-            for (let c = currentVisibleCols.first; c < currentVisibleCols.last; c++) {
-              const x = columnOffsets[c] + columns[c].width - 0.5 - currentScrollLeft;
-              ctx.beginPath();
-              ctx.moveTo(x, headerHeight);
-              ctx.lineTo(x, currentHeight);
-              ctx.strokeStyle = "#f0f0f0";
-              ctx.stroke();
-            }
-
-            ctx.restore();
-          });
-        });
-      }
-
-      ctx.restore();
-    },
-    [columns, columnOffsets, rowCount, rowHeight, headerHeight, totalWidth, deviceScale, fontFamily, getRows, scrollLeft, scrollTop, raf, containerRef, measureVisibleColumns]
-  );
-
-  useCanvasResize(canvasRef, containerRef, deviceScale, draw);
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    const container = containerRef.current;
-    if (!canvas || !container) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-    const rect = container.getBoundingClientRect();
-    draw(ctx, { width: rect.width, height: rect.height });
-  }, [scrollLeft, scrollTop, draw]);
+    };
+  }, [renderGrid]);
 
   return (
-    <div className="w-full h-full min-h-[520px] flex flex-col gap-3 text-sm">
-      <div className="flex items-center justify-between">
-        <div className="font-medium">Canvas DataGrid Demo</div>
-        <div className="text-xs opacity-70">{rowCount.toLocaleString()} rows × {columns.length} columns</div>
-      </div>
+    <div
+      ref={containerRef}
+      className={`relative overflow-hidden ${className}`}
+      style={{ width: '100%', height: '600px' }}
+    >
+
+      <canvas
+        ref={canvasRef}
+        className="absolute top-0 left-0 pointer-events-none"
+        style={{ imageRendering: 'pixelated' }}
+      />
+      {!isInitialized && (
+        <div className="absolute inset-0 flex items-center justify-center bg-gray-900">
+          <div className="text-white">Initializing grid...</div>
+        </div>
+      )}
       <div
-        ref={containerRef}
-        className="relative w-full h-[480px] overflow-auto rounded-xl border border-gray-200 bg-white"
-        onScroll={(e) => {
-          const el = e.currentTarget;
-          setScrollLeft(el.scrollLeft);
-          setScrollTop(el.scrollTop);
-        }}
+        ref={scrollRef}
+        className="absolute inset-0 overflow-auto"
+        onScroll={handleScroll}
       >
-        <div style={{ width: totalWidth, height: totalHeight }} />
-        <canvas ref={canvasRef} style={{ position: "absolute", inset: 0 }} />
-      </div>
-      <div className="text-xs text-gray-500">
-        Scroll horizontally and vertically. The grid virtualizes rows and columns and draws to a single HTML canvas.
+        <div
+          style={{
+            width: `${totalWidth}px`,
+            height: `${totalHeight}px`,
+            position: 'relative'
+          }}
+        />
       </div>
     </div>
   );

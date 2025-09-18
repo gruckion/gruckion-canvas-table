@@ -1,4 +1,4 @@
-import VirtualCanvasTable from "@/app/_components/virtual-canvas-table";
+import { CanvasTable } from "@/app/_components/canvas-table";
 
 export default function Home() {
   return (
@@ -6,7 +6,7 @@ export default function Home() {
       <main className="w-full h-full space-y-8">
         <div className="space-y-4">
           <h2 className="text-2xl font-bold">Virtual Canvas Table (100 columns × 10,000 rows)</h2>
-          <VirtualCanvasTable />
+          <CanvasTable />
         </div>
       </main>
     </div>
